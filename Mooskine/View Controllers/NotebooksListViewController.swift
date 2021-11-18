@@ -7,19 +7,44 @@
 //
 
 import UIKit
+import CoreData
 
-class NotebooksListViewController: UIViewController, UITableViewDataSource {
+class NotebooksListViewController: UIViewController, UITableViewDataSource, NSFetchedResultsControllerDelegate {
     /// A table view that displays a list of notebooks
     @IBOutlet weak var tableView: UITableView!
 
     /// The `Notebook` objects being presented
     var notebooks: [Notebook] = []
-
+    
+    //property to hold the data control
+    var dataController:DataController!
+    
+    var fetchedResultsController: NSFetchedResultsController<Notebook>!
+    
+    fileprivate func setUpFetchedResultsController() {
+        let fetchRequest: NSFetchRequest<Notebook> = Notebook.fetchRequest()
+        let sortDescriptor = NSSortDescriptor(key: "creationDate", ascending: false)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        
+        fetchedResultsController = NSFetchedResultsController(fetchRequest: fetchRequest, managedObjectContext: dataController.viewContext, sectionNameKeyPath: nil, cacheName: nil)
+        fetchedResultsController.delegate = self
+        
+        do {
+            try fetchedResultsController.performFetch()
+        } catch {
+            fatalError("The fetch could not be performed: \(error.localizedDescription)")
+        }
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationItem.titleView = UIImageView(image: #imageLiteral(resourceName: "toolbar-cow"))
         navigationItem.rightBarButtonItem = editButtonItem
-        updateEditButtonState()
+        
+        setUpFetchedResultsController()
+        
+        
+        reloadNotebooks()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -29,6 +54,11 @@ class NotebooksListViewController: UIViewController, UITableViewDataSource {
             tableView.deselectRow(at: indexPath, animated: false)
             tableView.reloadRows(at: [indexPath], with: .fade)
         }
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        fetchedResultsController = nil
     }
 
     // -------------------------------------------------------------------------
@@ -74,14 +104,31 @@ class NotebooksListViewController: UIViewController, UITableViewDataSource {
 
     /// Adds a new notebook to the end of the `notebooks` array
     func addNotebook(name: String) {
-        let notebook = Notebook(name: name)
-        notebooks.append(notebook)
-        tableView.insertRows(at: [IndexPath(row: numberOfNotebooks - 1, section: 0)], with: .fade)
+
+        let notebook = Notebook(context: dataController.viewContext)
+        notebook.name = name
+        notebook.creationDate = Date()
+        try? dataController.viewContext.save()
+        
+        reloadNotebooks()
+    }
+    
+    fileprivate func reloadNotebooks() {
+        let fetchRequest: NSFetchRequest<Notebook> = Notebook.fetchRequest()
+        let sortDescriptor = NSSortDescriptor(key: "creationDate", ascending: false)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        if let result = try? dataController.viewContext.fetch(fetchRequest) {
+            notebooks = result
+            tableView.reloadData()
+        }
         updateEditButtonState()
     }
 
     /// Deletes the notebook at the specified index path
     func deleteNotebook(at indexPath: IndexPath) {
+        let notebookToDelete = notebook(at: indexPath)
+        dataController.viewContext.delete(notebookToDelete)
+        try? dataController.viewContext.save()
         notebooks.remove(at: indexPath.row)
         tableView.deleteRows(at: [indexPath], with: .fade)
         if numberOfNotebooks == 0 {
@@ -116,9 +163,11 @@ class NotebooksListViewController: UIViewController, UITableViewDataSource {
 
         // Configure cell
         cell.nameLabel.text = aNotebook.name
-        let pageString = aNotebook.notes.count == 1 ? "page" : "pages"
-        cell.pageCountLabel.text = "\(aNotebook.notes.count) \(pageString)"
-
+        
+        if let count = aNotebook.notes?.count {
+            let pageString = count == 1 ? "page" : "pages"
+            cell.pageCountLabel.text = "\(count) \(pageString)"
+        }
         return cell
     }
 
@@ -145,6 +194,7 @@ class NotebooksListViewController: UIViewController, UITableViewDataSource {
         if let vc = segue.destination as? NotesListViewController {
             if let indexPath = tableView.indexPathForSelectedRow {
                 vc.notebook = notebook(at: indexPath)
+                vc.dataController = dataController
             }
         }
     }
