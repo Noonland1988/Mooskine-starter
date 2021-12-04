@@ -82,6 +82,11 @@ class NoteDetailsViewController: UIViewController {
         
         let selectedRange = textView.selectedRange
         let selectedText = textView.attributedText.attributedSubstring(from: selectedRange)
+        guard selectedText.length > 0 else {
+            print("nothing has selected")
+            return
+        }
+        
         let cowText = Pathifier.makeMutableAttributedString(for: selectedText, withFont: UIFont(name: "AvenirNext-Heavy", size: 56)!, withPatternImage: #imageLiteral(resourceName: "texture-cow"))
         
         newText.replaceCharacters(in: selectedRange, with: cowText)

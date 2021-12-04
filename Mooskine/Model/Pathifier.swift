@@ -67,10 +67,11 @@ internal struct Pathifier {
         path.fill()
         context?.setStrokeColor(UIColor.black.cgColor)
         path.stroke()
-        let image = UIGraphicsGetImageFromCurrentImageContext()
+        
+        let image = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
 
-        return image!
+        return image
     }
 
     static func makeMutableAttributedString(for attributedString: NSAttributedString, withFont font: UIFont, withPatternImage patternImage: UIImage) -> NSMutableAttributedString {
